@@ -54,3 +54,6 @@ __pycache__/
 *$py.class
 .Python
 dev.db
+
+# Local Netlify folder
+.netlify

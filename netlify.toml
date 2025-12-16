@@ -1,18 +1,20 @@
 [build]
   command = "npm run build"
   publish = "dist/public"
-  functions = "dist"
 
 [build.environment]
-  NODE_VERSION = "20"
+  NODE_VERSION = "20.x"
 
-# API routes - redirect to serverless function
-[[redirects]]
-  from = "/api/*"
-  to = "/.netlify/functions/index/:splat"
-  status = 200
+# Serve static frontend files
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-XSS-Protection = "1; mode=block"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "no-referrer-when-downgrade"
 
-# Client-side routing - redirect all other requests to index.html
+# All routes go to index.html for client-side routing
 [[redirects]]
   from = "/*"
   to = "/index.html"
