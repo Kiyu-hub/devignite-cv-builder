@@ -10,32 +10,17 @@ import { optimizeCVContent, generateCoverLetter, optimizeLinkedInProfile, analyz
 import { requireAdmin, requirePlan, hasFeatureAccess, hasReachedLimit } from "./middleware/rbac";
 import multer from "multer";
 import path from "path";
-import fs from "fs";
 import pricingConfig from "../config/pricing.json";
+import cloudinary from "./cloudinary";
 
 // Safely initialize Paystack client - gracefully handle missing key in development
 const paystackClient = process.env.PAYSTACK_SECRET_KEY 
   ? paystack(process.env.PAYSTACK_SECRET_KEY)
   : null;
 
-// Configure multer for file uploads
-const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
-
-const storage_multer = multer.diskStorage({
-  destination: (_req, _file, cb) => {
-    cb(null, uploadsDir);
-  },
-  filename: (_req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, 'profile-' + uniqueSuffix + path.extname(file.originalname));
-  }
-});
-
+// Configure multer for file uploads with memory storage (for Cloudinary)
 const upload = multer({
-  storage: storage_multer,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
   fileFilter: (_req, file, cb) => {
     const allowedTypes = /jpeg|jpg|png|webp/;
@@ -220,14 +205,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // File upload endpoint for profile photos (requires authentication)
-  app.post('/api/upload/profile-photo', isAuthenticated, upload.single('photo'), (req, res) => {
+  app.post('/api/upload/profile-photo', isAuthenticated, upload.single('photo'), async (req, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ error: 'No file uploaded' });
       }
       
-      // Return the URL path to access the uploaded image
-      const photoUrl = `/uploads/${req.file.filename}`;
+      // Upload to Cloudinary
+      const result = await new Promise((resolve, reject) => {
+        const uploadStream = cloudinary.uploader.upload_stream(
+          {
+            folder: 'devignite-cv-profiles',
+            resource_type: 'image',
+            transformation: [
+              { width: 500, height: 500, crop: 'limit' },
+              { quality: 'auto' }
+            ]
+          },
+          (error, result) => {
+            if (error) reject(error);
+            else resolve(result);
+          }
+        );
+        
+        uploadStream.end(req.file.buffer);
+      });
+      
+      // Return the Cloudinary URL
+      const photoUrl = (result as any).secure_url;
       res.json({ photoUrl });
     } catch (error) {
       console.error("Error uploading file:", error);

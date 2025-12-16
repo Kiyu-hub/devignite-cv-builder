@@ -79,6 +79,12 @@ VITE_CLERK_PUBLISHABLE_KEY=pk_test_your_key
 ADMIN_EMAIL=admin@devignite.com
 ADMIN_PASSWORD=admin123
 
+# Cloudinary File Storage (REQUIRED for profile photos)
+# Get from: https://cloudinary.com/console (FREE 25GB)
+CLOUDINARY_CLOUD_NAME=your_cloud_name
+CLOUDINARY_API_KEY=your_api_key
+CLOUDINARY_API_SECRET=your_api_secret
+
 # Optional (add later for full features)
 GROQ_API_KEY=gsk_your_key
 RESEND_API_KEY=re_your_key
