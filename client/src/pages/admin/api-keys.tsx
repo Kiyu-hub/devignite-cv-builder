@@ -305,9 +305,9 @@ export default function ApiKeysPage() {
                   <AlertDescription className="flex items-start justify-between gap-2">
                     <span className="text-sm">{selectedServiceInfo.description}</span>
                     <Button
-                      variant="link"
+                      variant="ghost"
                       size="sm"
-                      className="h-auto p-0 text-xs"
+                      className="h-auto p-0 text-xs underline"
                       onClick={() => window.open(selectedServiceInfo.link, '_blank')}
                     >
                       Get Key <ExternalLink className="ml-1 h-3 w-3" />

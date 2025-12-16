@@ -211,6 +211,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: 'No file uploaded' });
       }
       
+      const file = req.file;
+      
       // Upload to Cloudinary
       const result = await new Promise((resolve, reject) => {
         const uploadStream = cloudinary.uploader.upload_stream(
@@ -228,7 +230,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         );
         
-        uploadStream.end(req.file.buffer);
+        uploadStream.end(req.file!.buffer);
       });
       
       // Return the Cloudinary URL

@@ -1,16 +1,25 @@
-# Devignite CV Platform
+# 🚀 Devignite CV Platform
 
-A professional SaaS platform for creating, customizing, and purchasing CVs with AI-powered optimization.
+A professional SaaS platform for creating, customizing, and optimizing CVs with AI-powered features.
 
-## Features
+[![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![React](https://img.shields.io/badge/React-20232A?logo=react&logoColor=61DAFB)](https://reactjs.org/)
+[![Express](https://img.shields.io/badge/Express-000000?logo=express&logoColor=white)](https://expressjs.com/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-316192?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![Netlify](https://img.shields.io/badge/Netlify-00C7B7?logo=netlify&logoColor=white)](https://www.netlify.com/)
 
-- 🎨 **12 Professional CV Templates** - ATS-friendly designs inspired by RxResume
-- 🤖 **AI-Powered Optimization** - CV content enhancement, cover letter generation, LinkedIn optimization, and ATS analysis using Groq AI
-- 💳 **Paystack Payment Integration** - Secure payment processing in GHS (Ghana Cedis)
+## ✨ Features
+
+- 🎨 **12 Professional CV Templates** - ATS-friendly designs with single-column, two-column, and creative layouts
+- 🤖 **AI-Powered Optimization** - Content enhancement, cover letter generation, LinkedIn optimization, and ATS analysis (Groq AI)
+- 💳 **Payment Integration** - Secure Paystack payment processing
 - 📧 **Email Delivery** - Automated CV delivery via Resend
 - 📄 **PDF Generation** - High-quality PDF export using Puppeteer
-- 🔐 **Clerk Authentication** - Modal-based sign-in with Google, GitHub, Apple, and Email
-- 📦 **Package-Based Features** - Basic, Standard, and Premium tiers with different capabilities
+- 🔐 **Authentication** - Secure Clerk authentication with Google, GitHub, Apple, and Email
+- 📦 **Tiered Pricing** - Basic (Free), Pro, and Premium plans with different capabilities
+- 📊 **Admin Dashboard** - User management, analytics, email logs, and API key configuration
+- ☁️ **Cloud Storage** - Cloudinary integration for profile photos and media
+- 🎯 **Usage Limits** - Plan-based feature access and usage tracking
 
 ## Tech Stack
 
@@ -44,34 +53,52 @@ A professional SaaS platform for creating, customizing, and purchasing CVs with 
 
 ### Environment Variables
 
-Create a `.env` file with the following variables:
+See [SETUP_GUIDE.md](./SETUP_GUIDE.md) for detailed setup instructions.
+
+**Quick Setup (5 minutes):**
+
+1. **Database** (Supabase/Neon - Free tier available)
+2. **Authentication** (Clerk - Free tier available)
+3. **File Storage** (Cloudinary - Free tier available)
+4. **AI Features** (Groq - Free tier available)
+5. **Email** (Resend - Free tier available)
+
+All required services have generous free tiers. No credit card required for development!
+
+**Environment Variables:**
 
 ```env
-# Database
-DATABASE_URL=postgresql://user:password@host:port/database
-PGHOST=your-host
-PGPORT=5432
-PGUSER=your-user
-PGPASSWORD=your-password
-PGDATABASE=your-database
+# Database (Required)
+DATABASE_URL=postgresql://...
 
-# Clerk Authentication
-CLERK_SECRET_KEY=sk_test_...
+# Authentication (Required)
 CLERK_PUBLISHABLE_KEY=pk_test_...
+CLERK_SECRET_KEY=sk_test_...
 VITE_CLERK_PUBLISHABLE_KEY=pk_test_...
 
-# Payments
+# Cloud Storage (Required)
+CLOUDINARY_CLOUD_NAME=your_cloud_name
+CLOUDINARY_API_KEY=your_api_key
+CLOUDINARY_API_SECRET=your_api_secret
+
+# AI Features (Required)
+GROQ_API_KEY=gsk_...
+
+# Email Service (Required)
+RESEND_API_KEY=re_...
+RESEND_FROM_EMAIL=your-email@domain.com
+
+# Admin Account (Required)
+ADMIN_EMAIL=admin@yourdomain.com
+ADMIN_PASSWORD=your-secure-password
+
+# Payment Processing (Optional - for production)
 PAYSTACK_SECRET_KEY=sk_test_...
 PAYSTACK_PUBLIC_KEY=pk_test_...
 
-# AI Features
-GROQ_API_KEY=gsk_...
-
-# Email
-RESEND_API_KEY=re_...
-
-# Session
-SESSION_SECRET=your-random-secret-string
+# Application
+NODE_ENV=production
+APP_URL=https://your-site.netlify.app
 ```
 
 ### Installation
@@ -89,15 +116,79 @@ npm run dev
 
 The application will be available at `http://localhost:5000`
 
-## Deployment
+## 📚 Documentation
 
-### Netlify Deployment
+- **[SETUP_GUIDE.md](./SETUP_GUIDE.md)** - Quick setup guide (5 minutes)
+- **[NETLIFY_DEPLOY.md](./NETLIFY_DEPLOY.md)** - Deployment to Netlify
+- **[ADMIN_SETUP.md](./ADMIN_SETUP.md)** - Admin account setup
+- **[ADMIN_API_KEYS_GUIDE.md](./ADMIN_API_KEYS_GUIDE.md)** - API key configuration via admin dashboard
+- **[CLOUDINARY_SETUP.md](./CLOUDINARY_SETUP.md)** - Cloudinary cloud storage setup
+
+## 🚀 Quick Start
+
+```bash
+# 1. Install dependencies
+npm install
+
+# 2. Set up environment variables (copy from .env.example)
+cp .env.example .env
+# Edit .env with your credentials
+
+# 3. Push database schema
+npm run db:push
+
+# 4. Start development server
+npm run dev
+```
+
+Visit `http://localhost:5000` 🎉
+
+## 🏗️ Project Structure
+
+```
+devignite-cv-builder/
+├── client/                 # React frontend
+│   ├── src/
+│   │   ├── components/    # Reusable components
+│   │   ├── pages/         # Page components
+│   │   ├── lib/           # Utilities and helpers
+│   │   └── hooks/         # Custom React hooks
+│   └── index.html
+├── server/                 # Express backend
+│   ├── lib/               # Server utilities
+│   ├── middleware/        # Express middleware
+│   ├── routes.ts          # API routes
+│   ├── storage.ts         # Database operations
+│   └── index.ts           # Server entry point
+├── shared/                 # Shared types and schemas
+├── config/                 # Configuration files
+└── public/                 # Static assets
+```
+
+## 🔑 Admin Dashboard
+
+Access the admin dashboard at `/admin/login` with your admin credentials.
+
+**Features:**
+- 📊 Sales overview and analytics
+- 👥 User management (upgrade plans, reset usage)
+- 📧 Email logs
+- 🔑 API key configuration (no manual .env editing!)
+- 📈 Platform analytics
+
+## 🌐 Deployment
+
+### Netlify (Recommended)
+
+See [NETLIFY_DEPLOY.md](./NETLIFY_DEPLOY.md) for complete instructions.
+
+**Quick Deploy:**
 
 1. **Push to GitHub**:
 ```bash
-git init
 git add .
-git commit -m "Initial commit"
+git commit -m "Deploy to Netlify"
+git push origin main
 git branch -M main
 git remote add origin https://github.com/yourusername/devignite.git
 git push -u origin main
