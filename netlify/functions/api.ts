@@ -32,8 +32,12 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
 // Netlify Function Handler
 export const handler = async (event: any, context: any) => {
   await initialize();
-  const serverlessHandler = serverless(app, {
-    basePath: '/.netlify/functions/api'
-  });
+  
+  // Rewrite path to add /api prefix since Netlify strips it in the redirect
+  if (event.path && !event.path.startsWith('/api')) {
+    event.path = '/api' + event.path;
+  }
+  
+  const serverlessHandler = serverless(app);
   return serverlessHandler(event, context);
 };
