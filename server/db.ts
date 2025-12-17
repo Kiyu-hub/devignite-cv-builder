@@ -19,11 +19,12 @@ if (useSqlite) {
   console.log("✅ SQLite database ready at:", dbPath);
 } else if (!process.env.DATABASE_URL) {
   throw new Error("DATABASE_URL must be set. Did you forget to provision a database?");
-} else if (process.env.DATABASE_URL.includes("neon.tech")) {
-  // ✅ Neon PostgreSQL (serverless)
-  console.log("🔌 Using Neon PostgreSQL setup");
+} else if (process.env.DATABASE_URL.includes("neon.tech") || process.env.DATABASE_URL.includes("supabase.com")) {
+  // ✅ Neon or Supabase PostgreSQL (serverless) - both use the same driver
+  console.log("🔌 Using serverless PostgreSQL setup (Neon/Supabase)");
   const sql = neon(process.env.DATABASE_URL);
   db = drizzlePg(sql, { schema });
+  console.log("✅ Database connected successfully");
 } else {
   // ✅ Render or standard PostgreSQL
   console.log("🔌 Using standard PostgreSQL setup (Render or local)");
