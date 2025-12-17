@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
@@ -39,7 +40,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { UserX, Eye, Search, Ban, CheckCircle } from "lucide-react";
+import { UserX, Eye, Search, Ban, CheckCircle, Download, Mail } from "lucide-react";
 
 interface User {
   id: string;
@@ -67,6 +68,9 @@ export default function UserManagementPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [userDetailsDialog, setUserDetailsDialog] = useState<UserDetails | null>(null);
+  const [emailDialog, setEmailDialog] = useState<User | null>(null);
+  const [emailSubject, setEmailSubject] = useState("");
+  const [emailMessage, setEmailMessage] = useState("");
 
   const { data: users = [], isLoading } = useQuery({
     queryKey: ["/api/admin/users"],
@@ -201,6 +205,75 @@ export default function UserManagementPage() {
     }
   };
 
+  const exportToCSV = () => {
+    const csvData = filteredUsers.map(user => ({
+      Email: user.email,
+      Name: user.fullName || '',
+      Status: user.isActive === 1 ? 'Active' : 'Disabled',
+      Plan: user.currentPlan,
+      Role: user.isAdmin ? 'Admin' : 'User',
+      'Last Login': user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleString() : 'Never',
+      'Joined Date': new Date(user.createdAt).toLocaleString(),
+    }));
+
+    const headers = Object.keys(csvData[0] || {});
+    const csvContent = [
+      headers.join(','),
+      ...csvData.map(row => 
+        headers.map(header => {
+          const value = row[header as keyof typeof row];
+          return `"${value}"`;
+        }).join(',')
+      )
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `users_export_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    toast({
+      title: "Export successful",
+      description: `Exported ${filteredUsers.length} users to CSV`,
+    });
+  };
+
+  const sendEmailMutation = useMutation({
+    mutationFn: async ({ userId, subject, message }: { userId: string; subject: string; message: string }) => {
+      const response = await fetch(`/api/admin/users/${userId}/send-email`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ subject, message }),
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to send email");
+      }
+      return await response.json();
+    },
+    onSuccess: () => {
+      setEmailDialog(null);
+      setEmailSubject("");
+      setEmailMessage("");
+      toast({
+        title: "Email sent",
+        description: "Email has been sent successfully to the user",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to send email",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const filteredUsers = users.filter((user) => {
     const query = searchQuery.toLowerCase();
     return (
@@ -239,21 +312,31 @@ export default function UserManagementPage() {
 
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-4">
             <div>
               <CardTitle>All Users</CardTitle>
               <CardDescription>
                 {filteredUsers.length} of {users.length} user{users.length !== 1 ? 's' : ''}
               </CardDescription>
             </div>
-            <div className="relative w-72">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search users by email, name, or plan..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
-              />
+            <div className="flex items-center gap-2">
+              <div className="relative w-72">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search users by email, name, or plan..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+              <Button
+                variant="outline"
+                onClick={exportToCSV}
+                disabled={filteredUsers.length === 0}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Export CSV
+              </Button>
             </div>
           </div>
         </CardHeader>
@@ -315,6 +398,14 @@ export default function UserManagementPage() {
                             title="View Details"
                           >
                             <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setEmailDialog(user)}
+                            title="Send Email"
+                          >
+                            <Mail className="h-4 w-4" />
                           </Button>
                           <Select
                             value={selectedPlan[user.id] || user.currentPlan}
@@ -515,6 +606,66 @@ export default function UserManagementPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setUserDetailsDialog(null)}>
               Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Send Email Dialog */}
+      <Dialog open={!!emailDialog} onOpenChange={() => {
+        setEmailDialog(null);
+        setEmailSubject("");
+        setEmailMessage("");
+      }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Send Email to User</DialogTitle>
+            <DialogDescription>
+              Send a notification email to {emailDialog?.email}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium">Subject</label>
+              <Input
+                placeholder="Email subject..."
+                value={emailSubject}
+                onChange={(e) => setEmailSubject(e.target.value)}
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Message</label>
+              <Textarea
+                placeholder="Email message..."
+                value={emailMessage}
+                onChange={(e) => setEmailMessage(e.target.value)}
+                className="mt-1 min-h-[150px]"
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setEmailDialog(null);
+                setEmailSubject("");
+                setEmailMessage("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => emailDialog && sendEmailMutation.mutate({
+                userId: emailDialog.id,
+                subject: emailSubject,
+                message: emailMessage,
+              })}
+              disabled={!emailSubject || !emailMessage || sendEmailMutation.isPending}
+            >
+              {sendEmailMutation.isPending ? "Sending..." : "Send Email"}
             </Button>
           </DialogFooter>
         </DialogContent>

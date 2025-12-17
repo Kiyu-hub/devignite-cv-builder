@@ -1313,6 +1313,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Send email notification to user
+  app.post("/api/admin/users/:userId/send-email", isAuthenticated, requireAdmin, async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const { subject, message } = req.body;
+
+      if (!subject || !message) {
+        return res.status(400).json({ error: "Subject and message are required" });
+      }
+
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      const { getUncachableResendClient } = await import("./lib/resend-client");
+      const { client, fromEmail } = await getUncachableResendClient();
+
+      await client.emails.send({
+        from: fromEmail,
+        to: user.email,
+        subject: subject,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #ffffff;">
+            <div style="text-align: center; padding: 20px; background: linear-gradient(to right, #ef4b23, #f97316); border-radius: 8px 8px 0 0;">
+              <h1 style="color: #ffffff; margin: 0; font-size: 28px;">DevIgnite</h1>
+              <p style="color: #ffffff; margin: 5px 0 0 0;">Professional CV Builder</p>
+            </div>
+            
+            <div style="padding: 30px; background-color: #f9fafb; border-radius: 0 0 8px 8px;">
+              <p>Hi ${user.firstName || user.email},</p>
+              
+              <div style="margin: 20px 0; padding: 20px; background-color: #ffffff; border-radius: 8px; border-left: 4px solid #ef4b23;">
+                ${message.replace(/\n/g, '<br/>')}
+              </div>
+              
+              <p>If you have any questions or need assistance, feel free to contact us at <a href="mailto:devignite.cv@gmail.com" style="color: #ef4b23;">devignite.cv@gmail.com</a></p>
+              
+              <p style="margin-top: 30px;">Best regards,<br/>The DevIgnite Team</p>
+            </div>
+          </div>
+        `,
+      });
+
+      res.json({ 
+        success: true, 
+        message: "Email sent successfully" 
+      });
+    } catch (error) {
+      console.error("Error sending email:", error);
+      res.status(500).json({ error: "Failed to send email" });
+    }
+  });
+
   app.get("/api/admin/api-keys", isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const apiKeys = await storage.getAllApiKeys();
