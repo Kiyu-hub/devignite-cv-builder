@@ -107,6 +107,20 @@ function AdminRoute({ component: Component }: { component: React.ComponentType }
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
+  const [userRole, setUserRole] = React.useState<string | null>(null);
+  const [location] = useLocation();
+
+  // Fetch user role for admin redirect
+  React.useEffect(() => {
+    if (isAuthenticated && location === '/') {
+      fetch('/api/auth/user')
+        .then(res => res.ok ? res.json() : null)
+        .then(user => {
+          if (user) setUserRole(user.role);
+        })
+        .catch(() => setUserRole(null));
+    }
+  }, [isAuthenticated, location]);
 
   if (isLoading) {
     return (
@@ -119,9 +133,17 @@ function Router() {
     );
   }
 
+  // Auto-redirect admins to dashboard on landing page
+  if (isAuthenticated && location === '/' && userRole === 'admin') {
+    return <Redirect to="/admin/sales" />;
+  }
+
   return (
     <Switch>
       <Route path="/" component={LandingPage} />
+      <Route path="/admin">
+        <Redirect to="/admin/sales" />
+      </Route>
       <Route path="/create">
         <ProtectedRoute component={CreateCVPage} />
       </Route>
