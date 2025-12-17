@@ -171,7 +171,15 @@ Access the admin dashboard at `/admin/login` with your admin credentials.
 
 **Features:**
 - 📊 Sales overview and analytics
-- 👥 User management (upgrade plans, reset usage)
+- 👥 **Enhanced User Management**:
+  - Enable/Disable user accounts
+  - Delete users with cascade deletion
+  - View comprehensive user details and statistics
+  - Export users to CSV
+  - Send email notifications to users
+  - Search and filter users
+  - Update user plans
+  - Reset usage counters
 - 📧 Email logs
 - 🔑 API key configuration (no manual .env editing!)
 - 📈 Platform analytics
@@ -274,6 +282,18 @@ git push -u origin main
 - `POST /api/ai/generate-cover-letter` - Generate cover letter
 - `POST /api/ai/optimize-linkedin` - Optimize LinkedIn profile
 - `POST /api/ai/analyze-ats` - Analyze ATS compatibility
+
+### Admin (Require Admin Role)
+- `GET /api/admin/users` - List all users
+- `PATCH /api/admin/users/:userId/plan` - Update user plan
+- `POST /api/admin/users/:userId/reset-usage` - Reset user usage counters
+- `PATCH /api/admin/users/:userId/status` - Enable/disable user account
+- `DELETE /api/admin/users/:userId` - Delete user permanently
+- `GET /api/admin/users/:userId/details` - Get comprehensive user details
+- `GET /api/admin/users/:userId/cvs` - Get user's CVs
+- `POST /api/admin/users/:userId/send-email` - Send email notification to user
+- `GET /api/admin/sales` - Sales overview and analytics
+- `GET /api/admin/analytics` - Platform analytics
 
 ## License
 
