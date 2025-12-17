@@ -32,6 +32,8 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
 // Netlify Function Handler
 export const handler = async (event: any, context: any) => {
   await initialize();
-  const serverlessHandler = serverless(app);
+  const serverlessHandler = serverless(app, {
+    basePath: '/.netlify/functions/api'
+  });
   return serverlessHandler(event, context);
 };
