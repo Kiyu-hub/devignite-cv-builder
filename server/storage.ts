@@ -16,6 +16,8 @@ export interface IStorage {
   getAllUsers(): Promise<User[]>;
   updateUserPlan(userId: string, plan: string): Promise<void>;
   updateUserRole(userId: string, role: string): Promise<void>;
+  updateUserStatus(userId: string, isActive: number): Promise<void>;
+  deleteUser(userId: string): Promise<void>;
   
   // CV operations
   getCv(id: string): Promise<Cv | undefined>;
@@ -189,6 +191,30 @@ export class DbStorage implements IStorage {
       .update(users)
       .set({ role, updatedAt: new Date() })
       .where(eq(users.id, userId));
+  }
+
+  async updateUserStatus(userId: string, isActive: number): Promise<void> {
+    await db
+      .update(users)
+      .set({ isActive, updatedAt: new Date() })
+      .where(eq(users.id, userId));
+  }
+
+  async deleteUser(userId: string): Promise<void> {
+    // First delete all user's CVs
+    await db.delete(cvs).where(eq(cvs.userId, userId));
+    
+    // Delete all user's cover letters
+    await db.delete(coverLetters).where(eq(coverLetters.userId, userId));
+    
+    // Delete all user's orders
+    await db.delete(orders).where(eq(orders.userId, userId));
+    
+    // Delete usage counters
+    await db.delete(usageCounters).where(eq(usageCounters.userId, userId));
+    
+    // Finally delete the user
+    await db.delete(users).where(eq(users.id, userId));
   }
 
   // CV operations
@@ -581,6 +607,48 @@ export class MemStorage implements IStorage {
       user.updatedAt = new Date();
       this.users.set(userId, user);
     }
+  }
+
+  async updateUserStatus(userId: string, isActive: number): Promise<void> {
+    const user = this.users.get(userId);
+    if (user) {
+      user.isActive = isActive;
+      user.updatedAt = new Date();
+      this.users.set(userId, user);
+    }
+  }
+
+  async deleteUser(userId: string): Promise<void> {
+    // Delete all user's CVs
+    Array.from(this.cvs.entries()).forEach(([id, cv]) => {
+      if (cv.userId === userId) {
+        this.cvs.delete(id);
+      }
+    });
+    
+    // Delete all user's cover letters
+    Array.from(this.coverLetters.entries()).forEach(([id, letter]) => {
+      if (letter.userId === userId) {
+        this.coverLetters.delete(id);
+      }
+    });
+    
+    // Delete all user's orders
+    Array.from(this.orders.entries()).forEach(([id, order]) => {
+      if (order.userId === userId) {
+        this.orders.delete(id);
+      }
+    });
+    
+    // Delete usage counters
+    Array.from(this.usageCounters.entries()).forEach(([id, counter]) => {
+      if (counter.userId === userId) {
+        this.usageCounters.delete(id);
+      }
+    });
+    
+    // Finally delete the user
+    this.users.delete(userId);
   }
 
   // CV operations

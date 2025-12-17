@@ -1160,6 +1160,122 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Toggle user active status (disable/enable)
+  app.patch("/api/admin/users/:userId/status", isAuthenticated, requireAdmin, async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const { isActive } = req.body;
+      
+      if (typeof isActive !== 'boolean') {
+        return res.status(400).json({ error: "Invalid status value" });
+      }
+      
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      // Prevent disabling admin users
+      if (user.role === 'admin' && !isActive) {
+        return res.status(403).json({ error: "Cannot disable admin users" });
+      }
+      
+      await storage.updateUserStatus(userId, isActive ? 1 : 0);
+      
+      res.json({ 
+        success: true, 
+        message: `User ${isActive ? 'enabled' : 'disabled'} successfully` 
+      });
+    } catch (error) {
+      console.error("Error updating user status:", error);
+      res.status(500).json({ error: "Failed to update user status" });
+    }
+  });
+
+  // Delete user (soft delete - keeps data for audit)
+  app.delete("/api/admin/users/:userId", isAuthenticated, requireAdmin, async (req, res) => {
+    try {
+      const { userId } = req.params;
+      
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      // Prevent deleting admin users
+      if (user.role === 'admin') {
+        return res.status(403).json({ error: "Cannot delete admin users" });
+      }
+      
+      // Get user's CVs count before deletion
+      const userCvs = await storage.getCvsByUserId(userId);
+      
+      // Delete user and all their data
+      await storage.deleteUser(userId);
+      
+      res.json({ 
+        success: true, 
+        message: "User deleted successfully",
+        deletedCvs: userCvs.length
+      });
+    } catch (error) {
+      console.error("Error deleting user:", error);
+      res.status(500).json({ error: "Failed to delete user" });
+    }
+  });
+
+  // Get user's CVs (admin view)
+  app.get("/api/admin/users/:userId/cvs", isAuthenticated, requireAdmin, async (req, res) => {
+    try {
+      const { userId } = req.params;
+      
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      const cvs = await storage.getCvsByUserId(userId);
+      res.json(cvs);
+    } catch (error) {
+      console.error("Error fetching user CVs:", error);
+      res.status(500).json({ error: "Failed to fetch user CVs" });
+    }
+  });
+
+  // Get user details with stats
+  app.get("/api/admin/users/:userId/details", isAuthenticated, requireAdmin, async (req, res) => {
+    try {
+      const { userId } = req.params;
+      
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      const cvs = await storage.getCvsByUserId(userId);
+      const orders = await storage.getOrdersByUserId(userId);
+      const planStatus = await storage.getUserPlanStatus(userId);
+      
+      res.json({
+        user,
+        stats: {
+          totalCvs: cvs.length,
+          totalOrders: orders.length,
+          successfulOrders: orders.filter(o => o.status === 'successful').length,
+          totalSpent: orders
+            .filter(o => o.status === 'successful')
+            .reduce((sum, o) => sum + o.amount, 0),
+        },
+        planStatus,
+        recentCvs: cvs.slice(0, 5),
+        recentOrders: orders.slice(0, 5),
+      });
+    } catch (error) {
+      console.error("Error fetching user details:", error);
+      res.status(500).json({ error: "Failed to fetch user details" });
+    }
+  });
+
   app.get("/api/admin/analytics", isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const cvs = await storage.getAllCVs();

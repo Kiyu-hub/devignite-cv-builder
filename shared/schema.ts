@@ -24,6 +24,8 @@ export const users = pgTable("users", {
   role: text("role").default("user").notNull(), // user, admin
   currentPlan: text("current_plan").default("basic").notNull(), // basic, pro, premium
   planStartDate: timestamp("plan_start_date").defaultNow(),
+  isActive: integer("is_active").default(1).notNull(), // 1 = active, 0 = disabled
+  lastLoginAt: timestamp("last_login_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
