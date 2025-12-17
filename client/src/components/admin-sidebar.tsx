@@ -40,6 +40,14 @@ const adminMenuItems = [
   },
 ];
 
+const siteMenuItems = [
+  {
+    title: "Back to Site",
+    url: "/dashboard",
+    icon: Home,
+  },
+];
+
 export function AdminSidebar() {
   const [location] = useLocation();
 
@@ -48,12 +56,12 @@ export function AdminSidebar() {
       <SidebarHeader className="p-4">
         <Link href="/" className="flex items-center gap-2 cursor-pointer" data-testid="link-home">
           <Home className="h-5 w-5 text-primary" />
-          <span className="font-semibold">SmartCV Admin</span>
+          <span className="font-semibold">DevIgnite Admin</span>
         </Link>
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Dashboard</SidebarGroupLabel>
+          <SidebarGroupLabel>Admin Dashboard</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {adminMenuItems.map((item) => {
@@ -69,6 +77,23 @@ export function AdminSidebar() {
                   </SidebarMenuItem>
                 );
               })}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        <SidebarGroup>
+          <SidebarGroupLabel>Site Navigation</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {siteMenuItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton asChild>
+                    <Link href={item.url} data-testid="link-back-to-site">
+                      <item.icon />
+                      <span>{item.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

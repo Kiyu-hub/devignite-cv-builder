@@ -120,7 +120,7 @@ export default function SalesOverviewPage() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Badge variant="outline">Pro</Badge>
-                <span className="text-sm text-muted-foreground">GHS 50/month</span>
+                <span className="text-sm text-muted-foreground">GHS 120/month</span>
               </div>
               <span className="text-2xl font-bold" data-testid="count-pro-users">
                 {salesData?.planDistribution.pro || 0}
@@ -129,7 +129,7 @@ export default function SalesOverviewPage() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Badge variant="outline">Premium</Badge>
-                <span className="text-sm text-muted-foreground">GHS 99/month</span>
+                <span className="text-sm text-muted-foreground">GHS 150/month</span>
               </div>
               <span className="text-2xl font-bold" data-testid="count-premium-users">
                 {salesData?.planDistribution.premium || 0}
