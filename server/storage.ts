@@ -75,9 +75,15 @@ export interface IStorage {
 }
 
 export class DbStorage implements IStorage {
+  private initPromise: Promise<void>;
+  
   constructor() {
     // Initialize templates on startup
-    this.initializeTemplates();
+    this.initPromise = this.initializeTemplates();
+  }
+  
+  async waitForInit(): Promise<void> {
+    await this.initPromise;
   }
 
   private async initializeTemplates() {
@@ -922,6 +928,15 @@ export class MemStorage implements IStorage {
 }
 
 // Use database storage if DATABASE_URL is available, otherwise use in-memory storage
-export const storage: IStorage = process.env.DATABASE_URL
+const storageInstance = process.env.DATABASE_URL
   ? new DbStorage()
   : new MemStorage();
+
+export const storage: IStorage = storageInstance;
+
+// Export function to wait for initialization
+export async function waitForInitialization(): Promise<void> {
+  if (storageInstance instanceof DbStorage) {
+    await storageInstance.waitForInit();
+  }
+}

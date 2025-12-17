@@ -2,7 +2,7 @@ import serverless from "serverless-http";
 import express from "express";
 import { registerRoutes } from "../../server/routes.js";
 import { initializeAdminUser } from "../../server/admin-init.js";
-import { storage } from "../../server/storage.js";
+import { storage, waitForInitialization } from "../../server/storage.js";
 
 const app = express();
 app.use(express.json());
@@ -15,9 +15,12 @@ app.use('/uploads', express.static('public/uploads'));
 let initialized = false;
 const initialize = async () => {
   if (!initialized) {
+    // Wait for storage (templates) to initialize first
+    await waitForInitialization();
     await registerRoutes(app);
     await initializeAdminUser(storage);
     initialized = true;
+    console.log('[Netlify Function] Initialization complete');
   }
 };
 
