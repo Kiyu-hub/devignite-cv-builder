@@ -242,14 +242,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Health check endpoint
+  app.get("/api/health", async (_req, res) => {
+    try {
+      console.log('[HEALTH] Checking database connection...');
+      const templates = await storage.getAllTemplates();
+      res.json({ 
+        status: 'healthy',
+        database: 'connected',
+        templatesCount: templates.length,
+        env: process.env.NODE_ENV
+      });
+    } catch (error: any) {
+      console.error("[HEALTH] Database error:", error);
+      res.status(500).json({ 
+        status: 'unhealthy',
+        database: 'error',
+        error: error.message
+      });
+    }
+  });
+
   // Template endpoints
   app.get("/api/templates", async (_req, res) => {
     try {
+      console.log('[API] Fetching templates...');
       const templates = await storage.getAllTemplates();
+      console.log(`[API] Found ${templates.length} templates`);
       res.json(templates);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching templates:", error);
-      res.status(500).json({ error: "Failed to fetch templates" });
+      console.error("Error details:", error.message, error.stack);
+      res.status(500).json({ 
+        error: "Failed to fetch templates",
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
     }
   });
 
