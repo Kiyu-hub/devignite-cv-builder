@@ -31,11 +31,21 @@ export async function initializeAdminUser(storage: IStorage): Promise<void> {
         console.log(`✅ Admin user already exists: ${adminEmail}`);
       }
     } else {
-      // Create new admin user
-      // Note: In production, you'll need to actually sign up via Clerk first
-      // This is just to ensure the role is set to admin when they do
-      console.log(`⚠️  Admin user not found: ${adminEmail}`);
-      console.log(`📝 To create admin: Sign up with ${adminEmail} via Clerk, then restart server`);
+      // Create admin user directly in database for Clerk-less login fallback
+      console.log(`📝 Creating admin user: ${adminEmail}`);
+      
+      const adminUser = await storage.upsertUser({
+        id: `admin_${Date.now()}`, // Temporary ID until Clerk sync
+        email: adminEmail,
+        firstName: 'Admin',
+        lastName: 'User',
+        imageUrl: null,
+        role: 'admin',
+        currentPlan: 'premium', // Give admin full access
+      });
+      
+      console.log(`✅ Admin user created: ${adminEmail} (ID: ${adminUser.id})`);
+      console.log(`🔑 You can now login with: ${adminEmail}`);
     }
   } catch (error) {
     console.error("❌ Error initializing admin user:", error);
