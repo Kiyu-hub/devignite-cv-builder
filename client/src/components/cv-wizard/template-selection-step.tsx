@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Check, AlertCircle, Crown } from "lucide-react";
+import { Check, AlertCircle, Crown, Lock } from "lucide-react";
 import { CVTemplatePreview } from "@/components/cv-template-preview";
 import { dummyCvData } from "@/lib/dummyData";
 import {
@@ -26,6 +26,22 @@ export function TemplateSelectionStep({ form }: TemplateSelectionStepProps) {
   const { data: templates = [], isLoading, error } = useQuery<Template[]>({
     queryKey: ["/api/templates"],
   });
+
+  // Fetch user plan status
+  const { data: planStatus } = useQuery<{
+    planId: string;
+    planName: string;
+    limits: Record<string, number>;
+    usage: Record<string, number>;
+    features: Record<string, boolean>;
+  }>({
+    queryKey: ["/api/user/plan-status"],
+  });
+
+  // Check if user has access to premium templates
+  const userPlan = planStatus?.planName?.toLowerCase() || 'basic';
+  const hasPremiumAccess = userPlan === 'premium';
+  const canAccessPremiumTemplates = hasPremiumAccess || (planStatus?.limits?.templates || 0) >= 3;
 
   if (isLoading) {
     return (
@@ -100,11 +116,18 @@ export function TemplateSelectionStep({ form }: TemplateSelectionStepProps) {
                         </div>
                       )}
                       
-                      {/* Premium badge */}
-                      {template.isPremium === 1 && (
-                        <Badge className="absolute top-3 right-3 bg-primary z-10 shadow-lg">
-                          <Crown className="h-3 w-3 mr-1" />
+                      {/* Premium badge - only show if user doesn't have access */}
+                      {template.isPremium === 1 && !canAccessPremiumTemplates && (
+                        <Badge className="absolute top-3 right-3 bg-amber-500 z-10 shadow-lg">
+                          <Lock className="h-3 w-3 mr-1" />
                           Premium
+                        </Badge>
+                      )}
+                      {/* Unlocked badge for premium users */}
+                      {template.isPremium === 1 && canAccessPremiumTemplates && (
+                        <Badge className="absolute top-3 right-3 bg-green-500 z-10 shadow-lg">
+                          <Crown className="h-3 w-3 mr-1" />
+                          Unlocked
                         </Badge>
                       )}
                     </div>
