@@ -148,17 +148,22 @@ export default function ApiKeysPage() {
         body: JSON.stringify({ service, keyValue: key }),
       });
       if (!response.ok) {
-        const error = await response.json();
+        const error = await response.json().catch(() => ({ error: "Failed to add API key" }));
         throw new Error(error.error || "Failed to add API key");
       }
       return await response.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/api-keys"] });
+    onSuccess: async () => {
+      // Invalidate and refetch
+      await queryClient.invalidateQueries({ queryKey: ["/api/admin/api-keys"] });
+      await queryClient.refetchQueries({ queryKey: ["/api/admin/api-keys"] });
+      
+      // Close dialog and reset state
       setIsAddDialogOpen(false);
       setNewKeyService("");
       setNewKeyValue("");
       setSelectedServiceInfo(null);
+      
       toast({
         title: "API key saved",
         description: "The API key has been securely stored and will be used by the application",
@@ -178,11 +183,17 @@ export default function ApiKeysPage() {
       const response = await fetch(`/api/admin/api-keys/${service}`, {
         method: "DELETE",
       });
-      if (!response.ok) throw new Error("Failed to delete API key");
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: "Failed to delete API key" }));
+        throw new Error(error.error || "Failed to delete API key");
+      }
       return await response.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/api-keys"] });
+    onSuccess: async () => {
+      // Invalidate and refetch
+      await queryClient.invalidateQueries({ queryKey: ["/api/admin/api-keys"] });
+      await queryClient.refetchQueries({ queryKey: ["/api/admin/api-keys"] });
+      
       toast({
         title: "API key deleted",
         description: "The API key has been removed",

@@ -94,8 +94,9 @@ export default function UserManagementPage() {
       }
       return await response.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      await queryClient.refetchQueries({ queryKey: ["/api/admin/users"] });
       toast({
         title: "Plan updated",
         description: "User plan has been updated successfully",
@@ -146,8 +147,9 @@ export default function UserManagementPage() {
       }
       return await response.json();
     },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+    onSuccess: async (_, variables) => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      await queryClient.refetchQueries({ queryKey: ["/api/admin/users"] });
       toast({
         title: variables.isActive === 1 ? "User enabled" : "User disabled",
         description: `User has been ${variables.isActive === 1 ? "enabled" : "disabled"} successfully`,
@@ -173,8 +175,9 @@ export default function UserManagementPage() {
       }
       return await response.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      await queryClient.refetchQueries({ queryKey: ["/api/admin/users"] });
       setUserToDelete(null);
       toast({
         title: "User deleted",
@@ -256,7 +259,7 @@ export default function UserManagementPage() {
       }
       return await response.json();
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       setEmailDialog(null);
       setEmailSubject("");
       setEmailMessage("");
