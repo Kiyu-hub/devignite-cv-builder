@@ -37,7 +37,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 interface ApiKey {
   id: string;
   service: string;
-  key: string;
+  keyValue: string;
+  displayName: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -153,22 +154,36 @@ export default function ApiKeysPage() {
   const [visibleKeys, setVisibleKeys] = useState<Set<string>>(new Set());
   const [selectedServiceInfo, setSelectedServiceInfo] = useState<ServiceInfo | null>(null);
 
-  const { data: apiKeys = [], isLoading } = useQuery({
+  const { data: apiKeys = [], isLoading, error: apiKeysError } = useQuery({
     queryKey: ["/api/admin/api-keys"],
     queryFn: async () => {
-      const response = await fetch("/api/admin/api-keys");
-      if (!response.ok) throw new Error("Failed to fetch API keys");
+      const response = await fetch("/api/admin/api-keys", {
+        credentials: "include",
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to fetch API keys: ${response.status} ${errorText}`);
+      }
       return await response.json() as ApiKey[];
     },
+    retry: 2,
+    retryDelay: 1000,
   });
 
-  const { data: keyStatus, isLoading: isLoadingStatus } = useQuery<KeyStatusResponse>({
+  const { data: keyStatus, isLoading: isLoadingStatus, error: statusError } = useQuery<KeyStatusResponse>({
     queryKey: ["/api/admin/api-keys/status"],
     queryFn: async () => {
-      const response = await fetch("/api/admin/api-keys/status");
-      if (!response.ok) throw new Error("Failed to fetch API key status");
+      const response = await fetch("/api/admin/api-keys/status", {
+        credentials: "include",
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to fetch API key status: ${response.status} ${errorText}`);
+      }
       return await response.json();
     },
+    retry: 2,
+    retryDelay: 1000,
   });
 
   const addKeyMutation = useMutation({
@@ -282,6 +297,21 @@ export default function ApiKeysPage() {
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
           <p className="text-muted-foreground">Loading API keys...</p>
+          {(apiKeysError || statusError) && (
+            <div className="mt-4 p-4 bg-red-50 rounded-md max-w-md mx-auto">
+              <p className="text-sm text-red-600">
+                Error: {apiKeysError?.message || statusError?.message}
+              </p>
+              <Button
+                size="sm"
+                variant="outline"
+                className="mt-2"
+                onClick={() => window.location.reload()}
+              >
+                Retry
+              </Button>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -621,7 +651,7 @@ export default function ApiKeysPage() {
                         </TableCell>
                         <TableCell className="font-mono text-sm" data-testid={`key-${apiKey.service}`}>
                           <div className="flex items-center gap-2">
-                            {visibleKeys.has(apiKey.service) ? apiKey.key : maskKey(apiKey.key)}
+                            {visibleKeys.has(apiKey.service) ? apiKey.keyValue : maskKey(apiKey.keyValue)}
                             {isOverridden && (
                               <Badge variant="secondary" className="text-xs">
                                 Not Used
