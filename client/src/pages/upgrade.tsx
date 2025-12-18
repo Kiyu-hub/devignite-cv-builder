@@ -20,9 +20,11 @@ export default function UpgradePage() {
       const res = await apiRequest("POST", "/api/user/upgrade-plan", { plan });
       return await res.json();
     },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/user/plan-status"] });
+    onSuccess: async (data) => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/user/plan-status"] });
+      await queryClient.refetchQueries({ queryKey: ["/api/auth/user"] });
+      await queryClient.refetchQueries({ queryKey: ["/api/user/plan-status"] });
       
       toast({
         title: "Plan Upgraded!",
