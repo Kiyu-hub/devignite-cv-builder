@@ -1367,6 +1367,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get comprehensive API key status - both from database and environment
+  app.get("/api/admin/api-keys/status", isAuthenticated, requireAdmin, async (req, res) => {
+    try {
+      // Define all required services
+      const requiredServices = [
+        { key: 'CLOUDINARY_CLOUD_NAME', name: 'Cloudinary Cloud Name', category: 'storage' },
+        { key: 'CLOUDINARY_API_KEY', name: 'Cloudinary API Key', category: 'storage' },
+        { key: 'CLOUDINARY_API_SECRET', name: 'Cloudinary API Secret', category: 'storage' },
+        { key: 'CLERK_PUBLISHABLE_KEY', name: 'Clerk Publishable Key', category: 'auth' },
+        { key: 'CLERK_SECRET_KEY', name: 'Clerk Secret Key', category: 'auth' },
+        { key: 'GROQ_API_KEY', name: 'Groq AI API Key', category: 'ai' },
+        { key: 'RESEND_API_KEY', name: 'Resend API Key', category: 'email' },
+        { key: 'PAYSTACK_SECRET_KEY', name: 'Paystack Secret Key', category: 'payment' },
+        { key: 'PAYSTACK_PUBLIC_KEY', name: 'Paystack Public Key', category: 'payment' },
+        { key: 'DATABASE_URL', name: 'Database URL', category: 'database' },
+      ];
+
+      // Get all database keys
+      const dbKeys = await storage.getAllApiKeys();
+      const dbKeyMap = new Map(dbKeys.map(k => [k.service, k]));
+
+      // Check each service
+      const keyStatus = requiredServices.map(service => {
+        const envValue = process.env[service.key];
+        const dbKey = dbKeyMap.get(service.key);
+        
+        return {
+          service: service.key,
+          name: service.name,
+          category: service.category,
+          inEnvironment: !!envValue && envValue.length > 0,
+          inDatabase: !!dbKey,
+          isConfigured: !!envValue || !!dbKey,
+          source: envValue ? 'environment' : (dbKey ? 'database' : 'none'),
+          updatedAt: dbKey?.updatedAt,
+        };
+      });
+
+      res.json({
+        keys: keyStatus,
+        summary: {
+          total: requiredServices.length,
+          configured: keyStatus.filter(k => k.isConfigured).length,
+          missing: keyStatus.filter(k => !k.isConfigured).length,
+          inEnvironment: keyStatus.filter(k => k.inEnvironment).length,
+          inDatabase: keyStatus.filter(k => k.inDatabase).length,
+        }
+      });
+    } catch (error) {
+      console.error("Error fetching API key status:", error);
+      res.status(500).json({ error: "Failed to fetch API key status" });
+    }
+  });
+
   app.get("/api/admin/api-keys", isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const apiKeys = await storage.getAllApiKeys();
