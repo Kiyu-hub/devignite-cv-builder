@@ -1,8 +1,8 @@
 import serverless from "serverless-http";
 import express from "express";
-import { registerRoutes } from "../../server/routes.js";
-import { initializeAdminUser } from "../../server/admin-init.js";
-import { storage, waitForInitialization } from "../../server/storage.js";
+import { registerRoutes } from "../../server/routes";
+import { initializeAdminUser } from "../../server/admin-init";
+import { storage, waitForInitialization } from "../../server/storage";
 
 const app = express();
 app.use(express.json());
