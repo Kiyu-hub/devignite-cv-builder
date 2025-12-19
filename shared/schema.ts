@@ -440,3 +440,240 @@ export const insertApiKeySchema = createInsertSchema(apiKeys).omit({
 
 export type InsertApiKey = z.infer<typeof insertApiKeySchema>;
 export type ApiKey = typeof apiKeys.$inferSelect;
+
+// ==========================================
+// PHASE 1: FOUNDATION & SETUP - NEW TABLES
+// ==========================================
+
+// User Plan History - tracks all plan changes and upgrades
+export const userPlanHistory = pgTable("user_plan_history", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  
+  // Plan details
+  planType: text("plan_type").notNull(), // basic, pro, premium
+  previousPlan: text("previous_plan"), // For tracking upgrades/downgrades
+  
+  // Period tracking
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date"),
+  isActive: integer("is_active").default(1).notNull(), // 1 = active, 0 = expired
+  
+  // Payment details
+  amount: integer("amount"), // Amount paid in pesewas
+  currency: text("currency").default("GHS"),
+  paymentMethod: text("payment_method"), // paystack, card, bank_transfer
+  transactionReference: text("transaction_reference"),
+  
+  // Metadata
+  metadata: jsonb("metadata").$type<Record<string, any>>(),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertUserPlanHistorySchema = createInsertSchema(userPlanHistory).omit({ 
+  id: true, 
+  createdAt: true, 
+  updatedAt: true 
+});
+
+export type InsertUserPlanHistory = z.infer<typeof insertUserPlanHistorySchema>;
+export type UserPlanHistory = typeof userPlanHistory.$inferSelect;
+
+// Payment Transactions - comprehensive payment tracking
+export const paymentTransactions = pgTable("payment_transactions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  
+  // Transaction details
+  transactionType: text("transaction_type").notNull(), // plan_purchase, cv_payment, refund
+  amount: integer("amount").notNull(), // Amount in pesewas
+  currency: text("currency").default("GHS").notNull(),
+  
+  // Payment provider details
+  provider: text("provider").notNull(), // paystack, stripe, manual
+  providerReference: text("provider_reference"), // External transaction ID
+  providerStatus: text("provider_status"), // success, failed, pending
+  
+  // Status tracking
+  status: text("status").notNull().default("pending"), // pending, processing, completed, failed, refunded
+  
+  // Related entities
+  planType: text("plan_type"), // For plan purchases
+  orderId: varchar("order_id").references(() => orders.id, { onDelete: 'set null' }),
+  
+  // Additional information
+  description: text("description"),
+  errorMessage: text("error_message"),
+  metadata: jsonb("metadata").$type<Record<string, any>>(),
+  
+  // Timestamps
+  processedAt: timestamp("processed_at"),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertPaymentTransactionSchema = createInsertSchema(paymentTransactions).omit({ 
+  id: true, 
+  createdAt: true, 
+  updatedAt: true 
+});
+
+export type InsertPaymentTransaction = z.infer<typeof insertPaymentTransactionSchema>;
+export type PaymentTransaction = typeof paymentTransactions.$inferSelect;
+
+// Feature Usage Tracking - detailed usage analytics
+export const featureUsageTracking = pgTable("feature_usage_tracking", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  
+  // Feature identification
+  featureType: text("feature_type").notNull(), // cv_generation, cover_letter, ai_optimization, template_change, edit, export
+  featureName: text("feature_name").notNull(), // Specific feature name
+  
+  // Usage context
+  cvId: varchar("cv_id").references(() => cvs.id, { onDelete: 'cascade' }),
+  templateId: varchar("template_id").references(() => templates.id, { onDelete: 'set null' }),
+  
+  // Tracking details
+  usageCount: integer("usage_count").default(1).notNull(),
+  planAtUsage: text("plan_at_usage").notNull(), // Plan type when feature was used
+  
+  // Success tracking
+  wasSuccessful: integer("was_successful").default(1).notNull(), // 1 = success, 0 = failed
+  errorDetails: text("error_details"),
+  
+  // Performance metrics
+  processingTimeMs: integer("processing_time_ms"), // Time taken to process
+  
+  // Metadata
+  metadata: jsonb("metadata").$type<Record<string, any>>(),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertFeatureUsageTrackingSchema = createInsertSchema(featureUsageTracking).omit({ 
+  id: true, 
+  createdAt: true
+});
+
+export type InsertFeatureUsageTracking = z.infer<typeof insertFeatureUsageTrackingSchema>;
+export type FeatureUsageTracking = typeof featureUsageTracking.$inferSelect;
+
+// Plan Usage Limits - enforces usage limits per plan period
+export const planUsageLimits = pgTable("plan_usage_limits", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  
+  // Period tracking
+  planType: text("plan_type").notNull(), // basic, pro, premium
+  periodStart: timestamp("period_start").notNull(),
+  periodEnd: timestamp("period_end").notNull(),
+  
+  // Usage counters
+  cvGenerationsUsed: integer("cv_generations_used").default(0).notNull(),
+  cvGenerationsLimit: integer("cv_generations_limit").notNull(),
+  
+  coverLetterGenerationsUsed: integer("cover_letter_generations_used").default(0).notNull(),
+  coverLetterGenerationsLimit: integer("cover_letter_generations_limit").notNull(),
+  
+  aiOptimizationsUsed: integer("ai_optimizations_used").default(0).notNull(),
+  aiOptimizationsLimit: integer("ai_optimizations_limit").notNull(),
+  
+  editsUsed: integer("edits_used").default(0).notNull(),
+  editsLimit: integer("edits_limit").notNull(),
+  
+  exportsUsed: integer("exports_used").default(0).notNull(),
+  exportsLimit: integer("exports_limit").notNull(), // -1 = unlimited
+  
+  // Template access
+  templateAccessLevel: text("template_access_level").notNull(), // free, standard, premium
+  
+  // Metadata
+  metadata: jsonb("metadata").$type<Record<string, any>>(),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertPlanUsageLimitsSchema = createInsertSchema(planUsageLimits).omit({ 
+  id: true, 
+  createdAt: true, 
+  updatedAt: true 
+});
+
+export type InsertPlanUsageLimits = z.infer<typeof insertPlanUsageLimitsSchema>;
+export type PlanUsageLimits = typeof planUsageLimits.$inferSelect;
+
+// Audit Logs - comprehensive system audit trail
+export const auditLogs = pgTable("audit_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  
+  // Actor information
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'set null' }),
+  userEmail: text("user_email"),
+  userRole: text("user_role"), // user, admin
+  
+  // Action details
+  action: text("action").notNull(), // login, logout, create_cv, update_cv, delete_cv, payment, plan_change, etc.
+  entityType: text("entity_type"), // user, cv, order, payment, etc.
+  entityId: varchar("entity_id"),
+  
+  // Request details
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  requestMethod: text("request_method"), // GET, POST, PUT, DELETE
+  requestPath: text("request_path"),
+  
+  // Change tracking
+  oldValues: jsonb("old_values").$type<Record<string, any>>(),
+  newValues: jsonb("new_values").$type<Record<string, any>>(),
+  
+  // Result
+  status: text("status").notNull(), // success, failed
+  errorMessage: text("error_message"),
+  
+  // Metadata
+  metadata: jsonb("metadata").$type<Record<string, any>>(),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({ 
+  id: true, 
+  createdAt: true
+});
+
+export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
+export type AuditLog = typeof auditLogs.$inferSelect;
+
+// System Configuration - store dynamic system settings
+export const systemConfiguration = pgTable("system_configuration", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  
+  // Configuration key-value
+  configKey: text("config_key").notNull().unique(),
+  configValue: jsonb("config_value").$type<Record<string, any>>().notNull(),
+  
+  // Metadata
+  category: text("category").notNull(), // payment, features, limits, email, etc.
+  description: text("description"),
+  isEncrypted: integer("is_encrypted").default(0).notNull(), // 0 = no, 1 = yes
+  
+  // Versioning
+  version: integer("version").default(1).notNull(),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertSystemConfigurationSchema = createInsertSchema(systemConfiguration).omit({ 
+  id: true, 
+  createdAt: true, 
+  updatedAt: true 
+});
+
+export type InsertSystemConfiguration = z.infer<typeof insertSystemConfigurationSchema>;
+export type SystemConfiguration = typeof systemConfiguration.$inferSelect;

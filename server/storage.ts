@@ -3,7 +3,12 @@ import {
   users, cvs, orders, templates, coverLetters, emailLogs, apiKeys, usageCounters,
   type User, type UpsertUser, type Cv, type InsertCv, type Order, type InsertOrder, 
   type Template, type InsertTemplate, type CoverLetter, type InsertCoverLetter,
-  type EmailLog, type InsertEmailLog, type ApiKey, type InsertApiKey, type UsageCounter
+  type EmailLog, type InsertEmailLog, type ApiKey, type InsertApiKey, type UsageCounter,
+  // Phase 1 additions
+  userPlanHistory, paymentTransactions, featureUsageTracking, planUsageLimits, auditLogs, systemConfiguration,
+  type UserPlanHistory, type InsertUserPlanHistory, type PaymentTransaction, type InsertPaymentTransaction,
+  type FeatureUsageTracking, type InsertFeatureUsageTracking, type PlanUsageLimits, type InsertPlanUsageLimits,
+  type AuditLog, type InsertAuditLog, type SystemConfiguration, type InsertSystemConfiguration
 } from "@shared/schema";
 import { eq, desc, and, gte, lte, sql as drizzleSql } from "drizzle-orm";
 import { randomUUID } from "crypto";
@@ -74,6 +79,52 @@ export interface IStorage {
     usage: Record<string, number>;
     capabilities: string[];
   }>;
+  
+  // ==========================================
+  // PHASE 1: NEW STORAGE METHODS
+  // ==========================================
+  
+  // User Plan History operations
+  createUserPlanHistory(planHistory: InsertUserPlanHistory): Promise<UserPlanHistory>;
+  getUserPlanHistory(userId: string): Promise<UserPlanHistory[]>;
+  getActivePlanForUser(userId: string): Promise<UserPlanHistory | undefined>;
+  deactivatePreviousPlans(userId: string): Promise<void>;
+  
+  // Payment Transaction operations
+  createPaymentTransaction(transaction: InsertPaymentTransaction): Promise<PaymentTransaction>;
+  getPaymentTransaction(id: string): Promise<PaymentTransaction | undefined>;
+  getPaymentTransactionsByUserId(userId: string): Promise<PaymentTransaction[]>;
+  updatePaymentTransaction(id: string, transaction: Partial<InsertPaymentTransaction>): Promise<PaymentTransaction | undefined>;
+  getPaymentTransactionByReference(reference: string): Promise<PaymentTransaction | undefined>;
+  
+  // Feature Usage Tracking operations
+  trackFeatureUsage(usage: InsertFeatureUsageTracking): Promise<FeatureUsageTracking>;
+  getFeatureUsageByUser(userId: string, featureType?: string): Promise<FeatureUsageTracking[]>;
+  getFeatureUsageStats(userId: string, startDate: Date, endDate: Date): Promise<any>;
+  
+  // Plan Usage Limits operations
+  createPlanUsageLimits(limits: InsertPlanUsageLimits): Promise<PlanUsageLimits>;
+  getPlanUsageLimits(userId: string): Promise<PlanUsageLimits | undefined>;
+  updatePlanUsageLimits(id: string, limits: Partial<InsertPlanUsageLimits>): Promise<PlanUsageLimits | undefined>;
+  incrementPlanUsage(userId: string, usageType: string): Promise<void>;
+  resetPlanUsageLimits(userId: string): Promise<void>;
+  
+  // Audit Log operations
+  createAuditLog(log: InsertAuditLog): Promise<AuditLog>;
+  getAuditLogs(filters?: {
+    userId?: string;
+    action?: string;
+    entityType?: string;
+    startDate?: Date;
+    endDate?: Date;
+    limit?: number;
+  }): Promise<AuditLog[]>;
+  
+  // System Configuration operations
+  getSystemConfiguration(key: string): Promise<SystemConfiguration | undefined>;
+  getAllSystemConfigurations(category?: string): Promise<SystemConfiguration[]>;
+  upsertSystemConfiguration(config: InsertSystemConfiguration): Promise<SystemConfiguration>;
+  deleteSystemConfiguration(key: string): Promise<boolean>;
 }
 
 export class DbStorage implements IStorage {
@@ -521,6 +572,326 @@ export class DbStorage implements IStorage {
       usage,
       capabilities,
     };
+  }
+  
+  // ==========================================
+  // PHASE 1: IMPLEMENTATION OF NEW METHODS
+  // ==========================================
+  
+  // User Plan History
+  async createUserPlanHistory(planHistory: InsertUserPlanHistory): Promise<UserPlanHistory> {
+    const [result] = await db.insert(userPlanHistory).values(planHistory).returning();
+    return result;
+  }
+  
+  async getUserPlanHistory(userId: string): Promise<UserPlanHistory[]> {
+    return await db
+      .select()
+      .from(userPlanHistory)
+      .where(eq(userPlanHistory.userId, userId))
+      .orderBy(desc(userPlanHistory.createdAt));
+  }
+  
+  async getActivePlanForUser(userId: string): Promise<UserPlanHistory | undefined> {
+    const [result] = await db
+      .select()
+      .from(userPlanHistory)
+      .where(
+        and(
+          eq(userPlanHistory.userId, userId),
+          eq(userPlanHistory.isActive, 1)
+        )
+      )
+      .orderBy(desc(userPlanHistory.createdAt))
+      .limit(1);
+    return result;
+  }
+  
+  async deactivatePreviousPlans(userId: string): Promise<void> {
+    await db
+      .update(userPlanHistory)
+      .set({ isActive: 0, endDate: new Date() })
+      .where(
+        and(
+          eq(userPlanHistory.userId, userId),
+          eq(userPlanHistory.isActive, 1)
+        )
+      );
+  }
+  
+  // Payment Transactions
+  async createPaymentTransaction(transaction: InsertPaymentTransaction): Promise<PaymentTransaction> {
+    const [result] = await db.insert(paymentTransactions).values(transaction).returning();
+    return result;
+  }
+  
+  async getPaymentTransaction(id: string): Promise<PaymentTransaction | undefined> {
+    const [result] = await db
+      .select()
+      .from(paymentTransactions)
+      .where(eq(paymentTransactions.id, id))
+      .limit(1);
+    return result;
+  }
+  
+  async getPaymentTransactionsByUserId(userId: string): Promise<PaymentTransaction[]> {
+    return await db
+      .select()
+      .from(paymentTransactions)
+      .where(eq(paymentTransactions.userId, userId))
+      .orderBy(desc(paymentTransactions.createdAt));
+  }
+  
+  async updatePaymentTransaction(id: string, transaction: Partial<InsertPaymentTransaction>): Promise<PaymentTransaction | undefined> {
+    const [result] = await db
+      .update(paymentTransactions)
+      .set({ ...transaction, updatedAt: new Date() })
+      .where(eq(paymentTransactions.id, id))
+      .returning();
+    return result;
+  }
+  
+  async getPaymentTransactionByReference(reference: string): Promise<PaymentTransaction | undefined> {
+    const [result] = await db
+      .select()
+      .from(paymentTransactions)
+      .where(eq(paymentTransactions.providerReference, reference))
+      .limit(1);
+    return result;
+  }
+  
+  // Feature Usage Tracking
+  async trackFeatureUsage(usage: InsertFeatureUsageTracking): Promise<FeatureUsageTracking> {
+    const [result] = await db.insert(featureUsageTracking).values(usage).returning();
+    return result;
+  }
+  
+  async getFeatureUsageByUser(userId: string, featureType?: string): Promise<FeatureUsageTracking[]> {
+    const conditions = [eq(featureUsageTracking.userId, userId)];
+    if (featureType) {
+      conditions.push(eq(featureUsageTracking.featureType, featureType));
+    }
+    
+    return await db
+      .select()
+      .from(featureUsageTracking)
+      .where(and(...conditions))
+      .orderBy(desc(featureUsageTracking.createdAt));
+  }
+  
+  async getFeatureUsageStats(userId: string, startDate: Date, endDate: Date): Promise<any> {
+    const results = await db
+      .select()
+      .from(featureUsageTracking)
+      .where(
+        and(
+          eq(featureUsageTracking.userId, userId),
+          gte(featureUsageTracking.createdAt, startDate),
+          lte(featureUsageTracking.createdAt, endDate)
+        )
+      );
+    
+    // Aggregate stats by feature type
+    const stats: Record<string, { count: number; successful: number; failed: number }> = {};
+    results.forEach(r => {
+      if (!stats[r.featureType]) {
+        stats[r.featureType] = { count: 0, successful: 0, failed: 0 };
+      }
+      stats[r.featureType].count += r.usageCount;
+      if (r.wasSuccessful) {
+        stats[r.featureType].successful += r.usageCount;
+      } else {
+        stats[r.featureType].failed += r.usageCount;
+      }
+    });
+    
+    return stats;
+  }
+  
+  // Plan Usage Limits
+  async createPlanUsageLimits(limits: InsertPlanUsageLimits): Promise<PlanUsageLimits> {
+    const [result] = await db.insert(planUsageLimits).values(limits).returning();
+    return result;
+  }
+  
+  async getPlanUsageLimits(userId: string): Promise<PlanUsageLimits | undefined> {
+    const now = new Date();
+    const [result] = await db
+      .select()
+      .from(planUsageLimits)
+      .where(
+        and(
+          eq(planUsageLimits.userId, userId),
+          lte(planUsageLimits.periodStart, now),
+          gte(planUsageLimits.periodEnd, now)
+        )
+      )
+      .orderBy(desc(planUsageLimits.createdAt))
+      .limit(1);
+    return result;
+  }
+  
+  async updatePlanUsageLimits(id: string, limits: Partial<InsertPlanUsageLimits>): Promise<PlanUsageLimits | undefined> {
+    const [result] = await db
+      .update(planUsageLimits)
+      .set({ ...limits, updatedAt: new Date() })
+      .where(eq(planUsageLimits.id, id))
+      .returning();
+    return result;
+  }
+  
+  async incrementPlanUsage(userId: string, usageType: string): Promise<void> {
+    const limits = await this.getPlanUsageLimits(userId);
+    if (!limits) {
+      throw new Error('No active plan usage limits found for user');
+    }
+    
+    const updateField: any = {};
+    switch (usageType) {
+      case 'cv_generation':
+        updateField.cvGenerationsUsed = drizzleSql`${planUsageLimits.cvGenerationsUsed} + 1`;
+        break;
+      case 'cover_letter':
+        updateField.coverLetterGenerationsUsed = drizzleSql`${planUsageLimits.coverLetterGenerationsUsed} + 1`;
+        break;
+      case 'ai_optimization':
+        updateField.aiOptimizationsUsed = drizzleSql`${planUsageLimits.aiOptimizationsUsed} + 1`;
+        break;
+      case 'edit':
+        updateField.editsUsed = drizzleSql`${planUsageLimits.editsUsed} + 1`;
+        break;
+      case 'export':
+        updateField.exportsUsed = drizzleSql`${planUsageLimits.exportsUsed} + 1`;
+        break;
+      default:
+        throw new Error(`Unknown usage type: ${usageType}`);
+    }
+    
+    await db
+      .update(planUsageLimits)
+      .set({ ...updateField, updatedAt: new Date() })
+      .where(eq(planUsageLimits.id, limits.id));
+  }
+  
+  async resetPlanUsageLimits(userId: string): Promise<void> {
+    const limits = await this.getPlanUsageLimits(userId);
+    if (limits) {
+      await db
+        .update(planUsageLimits)
+        .set({
+          cvGenerationsUsed: 0,
+          coverLetterGenerationsUsed: 0,
+          aiOptimizationsUsed: 0,
+          editsUsed: 0,
+          exportsUsed: 0,
+          updatedAt: new Date(),
+        })
+        .where(eq(planUsageLimits.id, limits.id));
+    }
+  }
+  
+  // Audit Logs
+  async createAuditLog(log: InsertAuditLog): Promise<AuditLog> {
+    const [result] = await db.insert(auditLogs).values(log).returning();
+    return result;
+  }
+  
+  async getAuditLogs(filters?: {
+    userId?: string;
+    action?: string;
+    entityType?: string;
+    startDate?: Date;
+    endDate?: Date;
+    limit?: number;
+  }): Promise<AuditLog[]> {
+    const conditions = [];
+    
+    if (filters?.userId) {
+      conditions.push(eq(auditLogs.userId, filters.userId));
+    }
+    if (filters?.action) {
+      conditions.push(eq(auditLogs.action, filters.action));
+    }
+    if (filters?.entityType) {
+      conditions.push(eq(auditLogs.entityType, filters.entityType));
+    }
+    if (filters?.startDate) {
+      conditions.push(gte(auditLogs.createdAt, filters.startDate));
+    }
+    if (filters?.endDate) {
+      conditions.push(lte(auditLogs.createdAt, filters.endDate));
+    }
+    
+    let query = db
+      .select()
+      .from(auditLogs)
+      .orderBy(desc(auditLogs.createdAt));
+    
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+    
+    if (filters?.limit) {
+      query = query.limit(filters.limit) as any;
+    }
+    
+    return await query;
+  }
+  
+  // System Configuration
+  async getSystemConfiguration(key: string): Promise<SystemConfiguration | undefined> {
+    const [result] = await db
+      .select()
+      .from(systemConfiguration)
+      .where(eq(systemConfiguration.configKey, key))
+      .limit(1);
+    return result;
+  }
+  
+  async getAllSystemConfigurations(category?: string): Promise<SystemConfiguration[]> {
+    if (category) {
+      return await db
+        .select()
+        .from(systemConfiguration)
+        .where(eq(systemConfiguration.category, category))
+        .orderBy(systemConfiguration.configKey);
+    }
+    
+    return await db
+      .select()
+      .from(systemConfiguration)
+      .orderBy(systemConfiguration.category, systemConfiguration.configKey);
+  }
+  
+  async upsertSystemConfiguration(config: InsertSystemConfiguration): Promise<SystemConfiguration> {
+    // Try to find existing configuration
+    const existing = await this.getSystemConfiguration(config.configKey);
+    
+    if (existing) {
+      const [result] = await db
+        .update(systemConfiguration)
+        .set({
+          ...config,
+          version: existing.version + 1,
+          updatedAt: new Date(),
+        })
+        .where(eq(systemConfiguration.configKey, config.configKey))
+        .returning();
+      return result;
+    } else {
+      const [result] = await db
+        .insert(systemConfiguration)
+        .values(config)
+        .returning();
+      return result;
+    }
+  }
+  
+  async deleteSystemConfiguration(key: string): Promise<boolean> {
+    const result = await db
+      .delete(systemConfiguration)
+      .where(eq(systemConfiguration.configKey, key));
+    return true;
   }
 }
 
@@ -992,6 +1363,115 @@ export class MemStorage implements IStorage {
       usage,
       capabilities,
     };
+  }
+  
+  // ==========================================
+  // PHASE 1: STUB IMPLEMENTATIONS (In-Memory)
+  // ==========================================
+  
+  // User Plan History (stubs)
+  async createUserPlanHistory(planHistory: InsertUserPlanHistory): Promise<UserPlanHistory> {
+    throw new Error('Phase 1 features require DATABASE_URL to be set');
+  }
+  
+  async getUserPlanHistory(userId: string): Promise<UserPlanHistory[]> {
+    return [];
+  }
+  
+  async getActivePlanForUser(userId: string): Promise<UserPlanHistory | undefined> {
+    return undefined;
+  }
+  
+  async deactivatePreviousPlans(userId: string): Promise<void> {
+    // No-op for in-memory
+  }
+  
+  // Payment Transactions (stubs)
+  async createPaymentTransaction(transaction: InsertPaymentTransaction): Promise<PaymentTransaction> {
+    throw new Error('Phase 1 features require DATABASE_URL to be set');
+  }
+  
+  async getPaymentTransaction(id: string): Promise<PaymentTransaction | undefined> {
+    return undefined;
+  }
+  
+  async getPaymentTransactionsByUserId(userId: string): Promise<PaymentTransaction[]> {
+    return [];
+  }
+  
+  async updatePaymentTransaction(id: string, transaction: Partial<InsertPaymentTransaction>): Promise<PaymentTransaction | undefined> {
+    return undefined;
+  }
+  
+  async getPaymentTransactionByReference(reference: string): Promise<PaymentTransaction | undefined> {
+    return undefined;
+  }
+  
+  // Feature Usage Tracking (stubs)
+  async trackFeatureUsage(usage: InsertFeatureUsageTracking): Promise<FeatureUsageTracking> {
+    throw new Error('Phase 1 features require DATABASE_URL to be set');
+  }
+  
+  async getFeatureUsageByUser(userId: string, featureType?: string): Promise<FeatureUsageTracking[]> {
+    return [];
+  }
+  
+  async getFeatureUsageStats(userId: string, startDate: Date, endDate: Date): Promise<any> {
+    return {};
+  }
+  
+  // Plan Usage Limits (stubs)
+  async createPlanUsageLimits(limits: InsertPlanUsageLimits): Promise<PlanUsageLimits> {
+    throw new Error('Phase 1 features require DATABASE_URL to be set');
+  }
+  
+  async getPlanUsageLimits(userId: string): Promise<PlanUsageLimits | undefined> {
+    return undefined;
+  }
+  
+  async updatePlanUsageLimits(id: string, limits: Partial<InsertPlanUsageLimits>): Promise<PlanUsageLimits | undefined> {
+    return undefined;
+  }
+  
+  async incrementPlanUsage(userId: string, usageType: string): Promise<void> {
+    // No-op for in-memory
+  }
+  
+  async resetPlanUsageLimits(userId: string): Promise<void> {
+    // No-op for in-memory
+  }
+  
+  // Audit Logs (stubs)
+  async createAuditLog(log: InsertAuditLog): Promise<AuditLog> {
+    const auditLog: AuditLog = {
+      id: randomUUID(),
+      ...log,
+      createdAt: new Date(),
+    };
+    // Just log to console for in-memory
+    console.log('[Audit]', auditLog);
+    return auditLog;
+  }
+  
+  async getAuditLogs(filters?: any): Promise<AuditLog[]> {
+    return [];
+  }
+  
+  // System Configuration (stubs)
+  async getSystemConfiguration(key: string): Promise<SystemConfiguration | undefined> {
+    return undefined;
+  }
+  
+  async getAllSystemConfigurations(category?: string): Promise<SystemConfiguration[]> {
+    return [];
+  }
+  
+  async upsertSystemConfiguration(config: InsertSystemConfiguration): Promise<SystemConfiguration> {
+    throw new Error('Phase 1 features require DATABASE_URL to be set');
+  }
+  
+  async deleteSystemConfiguration(key: string): Promise<boolean> {
+    return false;
   }
 }
 
